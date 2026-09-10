@@ -21,6 +21,8 @@ Web mobile-first em **Next.js** + TypeScript, PostgreSQL com Row Level Security.
 
 Fase de concepção. Sem código ainda.
 
+🎯 **[MVP](docs/mvp.md)** — o que entra, o que fica de fora e a ordem de construção.
+
 📄 **[Visão de produto](docs/visao-produto.md)** — posicionamento, modelo de domínio, roadmap, riscos e métricas.
 
 🏗️ **[Arquitetura](docs/arquitetura.md)** — stack, estrutura do projeto, multi-tenant, regras de dinheiro, camada de IA e a economia do SaaS.
