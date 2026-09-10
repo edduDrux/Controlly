@@ -1,257 +1,171 @@
 # Controlly — Arquitetura
 
-> Decorre de [visao-produto.md](visao-produto.md). Resolve as decisões em aberto da seção 10 daquele documento.
+> Consolida as decisões técnicas tomadas: **SaaS multiusuário**, **web mobile-first com aplicativo nativo depois**, **TypeScript full-stack**.
+> Contexto de produto em [visao-produto.md](visao-produto.md).
 
 ---
 
-## 1. Decisões tomadas
+## 1. As três forças que moldam tudo
 
-| Decisão | Escolha | Consequência principal |
+1. **SaaS** → dados de terceiros no mesmo banco. Isolamento e criptografia deixam de ser boa prática e viram requisito.
+2. **Aplicativo nativo depois** → a lógica **não pode morar no framework web**. Se morar, o app nativo vira reescrita, não porte.
+3. **TypeScript nos dois lados** → o ativo a proteger é o **tipo compartilhado** entre domínio, API, web e futuro app. Toda decisão que quebra isso precisa se justificar muito bem.
+
+---
+
+## 2. Back-end em Rust ou Go?
+
+**Recomendação: não agora. Fique em TypeScript — mas isole o worker de sincronização para manter a porta aberta.**
+
+### Por que não
+
+**A carga deste sistema é I/O-bound, não CPU-bound.** Vale olhar o que o back-end de fato faz:
+
+| Operação | Natureza | Gargalo real |
 |---|---|---|
-| **Escopo** | Uso pessoal primeiro, **SaaS comercial como destino declarado** | Multi-tenant no schema desde o commit 1. Não existe "depois eu adapto" para isolamento de dados financeiros |
-| **Plataforma** | **Web mobile-first**, empacotado com **Capacitor** | O front tem que ser SPA estática. Isso elimina SSR e muda autenticação (seção 2) |
-| **Open Finance** | Somente leitura, via agregador | Sem ITP, sem autorização própria no BACEN |
-| **IA** | API hospedada, executada **só no servidor** | Chave de API nunca vai para o bundle |
+| Buscar transações no agregador | HTTP externo | Rede e rate limit do fornecedor |
+| Normalizar, deduplicar, inferir parcelas | String e regex | Trivial |
+| Calcular plano de quitação | Aritmética | **Microssegundos** |
+| Servir a API | Query + serialização | Postgres |
+| Orquestrar a IA | HTTP externo | Latência do modelo (segundos) |
 
-O ponto que muda tudo: **"pessoal primeiro, SaaS depois" não é desculpa para arquitetura de usuário único.** Retrofitar isolamento de dados em um app financeiro é como retrofitar freio — tecnicamente possível, e ninguém deveria querer descobrir se funciona. Custa quase nada colocar `user_id` em toda tabela hoje e custa uma reescrita amanhã.
+O argumento clássico para Rust/Go é desempenho de CPU. **Aqui ele não se aplica.** Amortizar 60 meses para algumas dezenas de compromissos é irrelevante em qualquer linguagem — inclusive JavaScript. O tempo de resposta vai ser dominado pelo agregador e pelo modelo de IA, e nenhum dos dois fica mais rápido porque seu back-end é Rust.
 
----
+**O que você perderia é concreto:**
 
-## 2. O que o Capacitor impõe
+- **Tipos compartilhados.** Hoje uma `Parcela` é definida uma vez e vale no motor, na API, na web e no futuro React Native. Com Rust/Go você passa a gerar tipos através de uma fronteira de linguagem — funciona, mas é atrito permanente, e é justamente a vantagem que te fez escolher TS.
+- **Duas linguagens para manter sozinho**, antes de ter receita.
+- **Tempo até a Fase 0**, que agora é o recurso mais escasso.
 
-Capacitor não é "o site num app". Ele muda premissas de arquitetura. Estas são as que doem se descobertas tarde:
+**Rust especificamente é o pior encaixe para esta fase.** Modelagem de domínio em Rust é genuinamente excelente — tipos novos para dinheiro, sem `null`, `match` exaustivo, `rust_decimal`. Mas o custo de desenvolvimento é alto, o ecossistema de SDK de IA é mais fino, e nada disso ajuda a descobrir se o produto tem mercado.
 
-### 2.1 O app roda de um bundle local
+### O único ponto onde Go se justificaria
 
-A origem em produção é `capacitor://localhost` (iOS) ou `http://localhost` (Android) — **não** o seu domínio.
+O **worker de sincronização**. Ele puxa N usuários × M conexões bancárias em agenda, é puro fan-out de I/O, não compartilha tipo nenhum com a interface, e tem contrato estreito: lê do agregador, normaliza, escreve no Postgres.
 
-**Consequências obrigatórias:**
+Se um dia ele virar gargalo de custo ou de confiabilidade, é **exatamente o tipo de componente que se reescreve isolado** — sem tocar em mais nada. Go se sairia bem ali: concorrência barata, binário estático, pouca memória.
 
-- **A build tem que ser estática.** SPA client-side. **SSR está fora** — Next.js com server components, Remix SSR e afins não empacotam. Se quiser Next.js, só em `output: 'export'`, e aí você perdeu o motivo de usar Next.js.
-- **Separação front/back é obrigatória**, não estilística. Todo dado vem por API.
-- **CORS** precisa liberar explicitamente `capacitor://localhost` e `http://localhost`. É a primeira coisa que quebra no primeiro build nativo.
+**Então a decisão prática é arquitetural, não linguística:** mantenha o sync como serviço separado, comunicando por fila e por Postgres. Você compra a opção de portar depois sem pagar por ela agora.
 
-### 2.2 Autenticação por cookie não funciona bem
+### Gatilho para reconsiderar
 
-Origem diferente do backend + restrições de cookie de terceiros = sessão por cookie `httpOnly` é fonte de sofrimento no Capacitor.
+Reabra a discussão quando **medir**, não quando intuir:
 
-**Decisão:** autenticação **por token** (access token curto + refresh token), com o token guardado no **Keychain (iOS) / Keystore (Android)** através de um plugin de armazenamento seguro.
+- O sync entra nos três maiores itens da conta de infraestrutura
+- Você sincroniza milhares de conexões e o perfil de memória do Node é comprovadamente o limite
+- Entra alguém no time com força real em Go
 
-> ⚠️ `@capacitor/preferences` **não é criptografado** — é `UserDefaults`/`SharedPreferences`. Serve para preferência de tema. **Nunca** para token de acesso a dado bancário.
+**Não é gatilho:** "Rust é mais rápido". Sem perfil de execução na mão, isso é preferência, não engenharia.
 
-Na web pura (mesmo código rodando no navegador), o token cai em memória com refresh silencioso, não em `localStorage`.
-
-### 2.3 O redirect do Open Finance é o ponto crítico
-
-A jornada de consentimento manda o usuário para o app ou site do banco e traz de volta. No Capacitor isso tem uma armadilha séria:
-
-> **Bancos bloqueiam WebView embarcada em telas de autenticação.** É defesa contra captura de credencial, e está correto. Se você abrir o consentimento na WebView do próprio app, **quebra** — e você vai perder tempo achando que é bug seu.
-
-**Caminho correto:**
-
-```
-App  →  @capacitor/browser  →  navegador do sistema
-                                (SFSafariViewController / Chrome Custom Tabs)
-                                       ↓
-                                consentimento no banco
-                                       ↓
-     ←  deep link (Universal Link / App Link)  ←  callback
-                                       ↓
-         @capacitor/app  →  listener appUrlOpen  →  troca o code
-```
-
-**Isto precisa ser prototipado na primeira semana da Fase 2, antes de qualquer outra coisa dessa fase.** É o maior risco técnico do projeto inteiro, e é o tipo de coisa que só aparece em device real.
-
-Verificar também se o widget de conexão do agregador escolhido (Pluggy Connect, Belvo Widget, equivalentes) é suportado em Capacitor — vários são pensados para web em navegador. **Pergunte ao fornecedor antes de assinar contrato.**
-
-### 2.4 O que o Capacitor te dá de volta
-
-Justifica a escolha e não é pouco:
-
-- **Biometria** (Face ID / digital) para travar o app. Para app financeiro isso é obrigatório, não enfeite.
-- **Push nativo** (APNs/FCM). A Fase 3 é feita de alerta — "sua fatura projetada estourou o previsto". Push na web no iOS é frágil; nativo não é.
-- **Armazenamento seguro** de token.
-- Detecção de screenshot, bloqueio ao ir para segundo plano — higiene de app financeiro.
-
-### 2.5 Loja de aplicativos
-
-Dois pontos a planejar, não a descobrir:
-
-- **Apple, Guideline 4.2 (Minimum Functionality).** App que é só um site empacotado é rejeitado. Usar biometria, push e armazenamento seguro nativos resolve — mais uma razão para fazê-los cedo.
-- **App financeiro que conecta conta bancária recebe escrutínio extra** nas duas lojas. Política de privacidade publicada, descrição honesta do uso de dados e demonstração de legitimidade precisam estar prontas antes da submissão.
+> Nota lateral: TS não tem decimal nativo, e Rust/Go têm (`rust_decimal`, `shopspring/decimal`). É uma vantagem real, mas pequena — **inteiros em centavos** fecham a lacuna por completo (seção 5). Não é motivo para trocar de linguagem.
 
 ---
 
-## 3. Stack
-
-### Frontend
-
-```
-Vite + React + TypeScript        SPA, empacotável pelo Capacitor
-TanStack Query                   cache e sincronização de servidor
-Tailwind                         mobile-first de verdade
-Capacitor                        shell nativo
-```
-
-**Ionic UI ou não?** Você citou "Capacitor by Ionic" — vale saber que os dois são separáveis. Capacitor funciona sozinho, sem o framework de UI do Ionic.
-
-- **Ionic React**: componentes que parecem nativos, navegação e gestos prontos. Bom se quer cara de app.
-- **Tailwind puro**: controle total. A linha do tempo de caixa futuro é uma visualização customizada — o componente mais importante do produto não vem pronto em biblioteca nenhuma.
-
-**Inclinação:** Capacitor + Tailwind, sem o framework de UI. A tela que define o produto é feita à mão de qualquer jeito, e o Ionic cobra peso de bundle e opinião de layout por componentes que você vai usar pouco. Decisão reversível — dá para adotar Ionic depois.
-
-### Backend
-
-```
-Node + TypeScript (Fastify ou NestJS)
-PostgreSQL
-```
-
-**Por que TypeScript no backend, e não Python:** existe uma vantagem específica deste projeto que decide o empate.
-
-> Se o **motor financeiro for um pacote TypeScript puro, sem I/O**, ele roda **no servidor e no cliente com o mesmo código**.
-
-Isso significa simulação "e se eu aportar mais R$ 300?" com slider respondendo **instantaneamente, sem round-trip**, e o mesmo código validando no servidor. Para uma tela de simulação de quitação, isso é a diferença entre brinquedo e ferramenta. Python não te dá isso.
-
-### Banco
-
-**PostgreSQL** com **Row Level Security**. Supabase ou Neon; Supabase entrega Postgres + Auth + RLS prontos e encurta bastante o caminho para um dev solo.
-
----
-
-## 4. Multi-tenant e isolamento
-
-Regras que valem desde a primeira migration:
-
-1. **Toda tabela de domínio tem `user_id NOT NULL`.** Sem exceção, mesmo enquanto o usuário é você.
-2. **Row Level Security ligada em todas elas.** Isolamento no banco, não na aplicação. Um `WHERE user_id = ?` esquecido em um endpoint vira vazamento de extrato bancário entre clientes — o pior incidente possível para este produto. RLS transforma esse bug em zero linhas retornadas.
-3. **Nenhuma query de domínio roda com role que faz bypass de RLS.** Service role só em migration e job administrativo.
-4. **Teste de isolamento no CI**: usuário A não enxerga nada de B. Teste automatizado, rodando sempre, desde antes de existir um usuário B.
-
----
-
-## 5. Dinheiro: regras invioláveis
-
-- **Nunca float. Nunca.** `0.1 + 0.2 !== 0.3`, e em app financeiro isso vira centavo errado em fatura.
-- Armazenar em **centavos como inteiro** (`bigint`). Formatar só na borda de exibição.
-- Arredondamento explícito e documentado em toda divisão — parcelamento gera resto, e o resto tem que ir para algum lugar definido (convenção: sobra na primeira parcela, como a maioria das operadoras faz).
-- Toda operação monetária passa pelo motor, com teste. Nenhuma aritmética de dinheiro solta em componente de UI.
-
----
-
-## 6. Camada de IA
-
-```
-Cliente  →  seu backend  →  API do modelo
-             (chave aqui)
-```
-
-- **A chave de API nunca vai para o bundle.** Bundle de Capacitor é um zip: qualquer pessoa extrai. Toda chamada passa pelo seu backend.
-- **Tool calling obrigatório.** O modelo chama `simular_plano`, `projetar_caixa`, `listar_compromissos`. Números só saem do motor determinístico.
-- **Não enviar extrato bruto.** Agregados e recortes mínimos — privacidade, custo e qualidade de contexto ao mesmo tempo.
-- **Rate limit por usuário no backend.** Sem isso, um usuário curioso com um loop vira uma fatura de API surpreendente.
-- Categorização em cascata: regra → dicionário de merchants → modelo (só desconhecidos) → resultado vira regra.
-
----
-
-## 7. A economia do SaaS
-
-Aqui está o insight mais valioso desta seção, e ele resolve um problema de produto e um de custo ao mesmo tempo.
-
-**Seus custos variáveis por usuário:**
-
-| Custo | Comportamento |
-|---|---|
-| Agregador Open Finance | Por conexão/mês. **Dominante.** Um usuário com 3 contas custa 3× |
-| API do modelo | Por uso. Controlável com cache e cascata de categorização |
-| Infra | Marginal no começo |
-
-> ⚠️ Preços de agregador mudam e variam por volume. Confirme na fonte antes de modelar qualquer coisa a sério.
-
-**A conclusão que decide o produto:**
-
-O plano gratuito **não pode incluir conexão bancária.** É o único custo que escala linearmente e que você não controla.
-
-E isso cai perfeitamente onde precisa:
-
-```
-GRÁTIS   importação manual + OFX/CSV, compromissos,
-         linha do tempo de caixa futuro
-         → custo marginal ~ zero
-
-PAGO     conexão bancária automática + assistente de IA
-         → exatamente onde está o seu custo
-```
-
-Repare que **o paywall tem a mesma forma do roadmap.** Fases 0 e 1 são o plano gratuito. Fases 2 e 3 são o pago. Isso não é coincidência — é o produto avisando que a sequência está certa. E o gratuito é genuinamente útil sozinho, o que faz dele aquisição em vez de isca.
-
-**Nota comercial:** agregadores em geral contratam com CNPJ, não com pessoa física. Isso é um portão prático para a Fase 2 — resolver antes, não durante.
-
----
-
-## 8. LGPD, na condição de controlador
-
-Enquanto for só você, quase nada disso morde. **No primeiro usuário externo, tudo passa a valer:**
-
-- Política de privacidade publicada e honesta
-- Base legal definida por finalidade; consentimento **granular** para a IA (usar o app sem IA precisa ser possível)
-- Contrato de tratamento de dados com o agregador (ele é operador, você é controlador)
-- Exportar e apagar tudo, de verdade, incluindo revogar o consentimento no agregador
-- Plano de resposta a incidente, escrito antes de precisar dele
-- Canal de contato do titular
-
-Criptografia em repouso para transações e, obrigatoriamente, para tokens do agregador — em cofre de chaves. **Nunca logar payload** de transação ou de resposta do agregador.
-
----
-
-## 9. Estrutura sugerida
+## 3. Organização do código
 
 ```
 controlly/
-├─ apps/
-│  ├─ web/          Vite + React + Capacitor
-│  │  ├─ ios/
-│  │  └─ android/
-│  └─ api/          Fastify/NestJS
 ├─ packages/
-│  ├─ engine/       ⭐ motor financeiro — TS puro, zero I/O, cobertura alta
-│  │                    roda no servidor E no cliente
-│  ├─ domain/       tipos e schemas compartilhados (Zod)
-│  └─ importers/    OFX, CSV, e depois adapters de Open Finance
-└─ docs/
+│  ├─ core/        domínio + motor de planos + inferência de parcelas
+│  │               ZERO I/O, zero framework. 100% testável em memória
+│  ├─ contracts/   schemas Zod = fonte única de verdade dos tipos
+│  ├─ db/          schema Drizzle, migrations, políticas RLS
+│  ├─ sources/     adapters: manual | ofx | csv | openfinance
+│  └─ ai/          definição de ferramentas + orquestração do LLM
+└─ apps/
+   ├─ web/         Next.js App Router, mobile-first
+   ├─ sync/        worker de sincronização (o candidato a Go)
+   └─ mobile/      React Native — Fase 4
 ```
 
-`packages/engine` é o coração e o único lugar onde vive aritmética de dinheiro. Se ele tiver dependência de rede ou de banco, a decisão da seção 3 foi perdida — ele deixa de rodar no cliente.
+`packages/core` é a peça inegociável. Sem I/O, sem `fetch`, sem acesso a banco, sem dependência de Next. Só funções puras sobre o domínio. É o que torna o motor testável de verdade e o que sobrevive a qualquer troca de framework.
+
+### API-first sem over-engineering
+
+Você vai querer um app nativo depois, mas **não crie um serviço de API separado agora** — é peso sem retorno na Fase 0.
+
+A regra que entrega o mesmo resultado de graça:
+
+> **Route handler é transporte, nunca lógica.** No máximo ~20 linhas: valida a entrada, autoriza, chama `core`, serializa a saída.
+
+Se essa regra for respeitada, extrair `apps/api` na Fase 4 é mecânico, porque não existe lógica presa ao Next para desgrudar. Se for violada, o app nativo custa uma reescrita. É a regra mais barata de seguir e a mais cara de ignorar.
+
+**Contrato:** tRPC resolve bem, já que web e React Native são ambos TS. Mantenha os schemas Zod em `contracts` para conseguir gerar OpenAPI depois, se surgir cliente externo.
 
 ---
 
-## 10. Roadmap revisado
+## 4. Multi-tenancy
 
-**Fase 0 — Núcleo (grátis)**
-Domínio + RLS, import OFX/CSV, entrada manual, inferência de parcelas, linha do tempo de caixa futuro. Web responsiva.
-*Saída:* você usa todo dia, sem banco conectado.
+Com dados financeiros de terceiros, filtrar por `user_id` na aplicação **não é suficiente** — um `where` esquecido vaza dados de outra pessoa.
 
-**Fase 0.5 — Casca nativa**
-Capacitor, biometria, armazenamento seguro, build nas duas plataformas.
-*Por que agora:* descobrir dor de empacotamento com 5 telas, não com 40. E resolve a Guideline 4.2 cedo.
+**Defesa no banco: Row Level Security do Postgres.**
 
-**Fase 1 — Inteligência (pago)**
-Motor de planos com testes, chat com tool calling, categorização em cascata.
+- Toda tabela de dados do usuário carrega `user_id`
+- Política RLS: a linha só é visível se `user_id = current_setting('app.user_id')::uuid`
+- A aplicação define esse valor por transação
+- Um `where` esquecido passa a retornar **vazio**, não os dados de outra pessoa
 
-**Fase 2 — Open Finance (pago)**
-**Semana 1: provar o fluxo de deep link em device real.** Depois sandbox → um banco → demais. Reconciliação de parcelas.
-
-**Fase 3 — Automação**
-Push de fatura projetada, gasto-fantasma, alerta de comprometimento.
-
-**Fase 4 — Comercial**
-Assinatura, CNPJ, LGPD completa, lojas.
+⚠️ Com pool de conexões (PgBouncer, serverless), use `SET LOCAL` **dentro da transação** — `SET` normal vaza contexto entre requisições, o que seria pior que não ter RLS.
 
 ---
 
-## 11. Decisões que ficam para depois
+## 5. Dinheiro e datas
 
-- Ionic UI ou Tailwind puro — reversível, decidir ao construir a linha do tempo
-- Supabase ou Postgres gerenciado + auth própria — pesar velocidade contra dependência de fornecedor
-- Qual agregador — decidir na Fase 2, **mas validar preço, cobertura e suporte a Capacitor agora**
-- Preço da assinatura — depende do custo real do agregador
+### Dinheiro: inteiros em centavos. Sem exceção.
+
+- **Nunca** `float`, `double`, `real` ou o tipo `money` do Postgres
+- Armazene `bigint` em centavos; formate só na borda de exibição
+- `0.1 + 0.2 !== 0.3` — em app financeiro isso vira erro de centavo em relatório e destrói confiança
+- Um tipo nomeado (`type Centavos = number`) documenta a unidade e evita somar reais com centavos por engano
+
+### Datas: o calendário do cartão é traiçoeiro
+
+- **Fechamento ≠ vencimento.** Uma compra depois do fechamento cai na fatura seguinte. Modele os dois.
+- Vencimento é `date`, não `timestamptz` — é dia de calendário, não instante
+- "Hoje" é `America/Sao_Paulo`, via IANA, nunca offset fixo no código
+- Vencimento em fim de semana ou feriado desloca — regra do emissor, precisa ser explícita
+
+Esses detalhes parecem menores e são exatamente onde app de finanças perde credibilidade.
+
+---
+
+## 6. Segurança
+
+O token do agregador dá acesso de leitura à vida financeira inteira de alguém. Trate como o ativo mais sensível do sistema.
+
+- **Criptografia envelopada** com cofre de chaves (KMS/Vault). Nunca chave em variável de ambiente em texto puro em produção
+- **Nunca logar payload** de transação ou resposta do agregador. Log estruturado com redação por padrão
+- Trilha de auditoria de todo acesso a dado financeiro
+- Escopo somente leitura, sem iniciação de pagamento — limita o dano máximo de um vazamento
+- Rotação de chave prevista desde o início; retrofit é caro
+
+---
+
+## 7. Testes: onde eles realmente importam
+
+Cobertura uniforme é desperdício. Concentre onde o erro é caro:
+
+| Área | Rigor | Por quê |
+|---|---|---|
+| Motor de planos (`core`) | **Máximo** — casos de borda, propriedades | Número errado destrói a confiança do usuário |
+| Inferência e reconciliação de parcelas | **Máximo** — corpus real de descrições sujas | É o diferencial do produto |
+| Políticas RLS | **Alto** — teste que prova isolamento entre tenants | Falha aqui é vazamento |
+| Dinheiro e datas | **Alto** | Erro silencioso e corrosivo |
+| Adapters de fonte | Médio, com fixtures gravadas | Formato externo muda |
+| UI | Fluxos críticos | Retorno decrescente |
+
+O motor não faz I/O — então esses testes rodam em milissegundos e podem ser exaustivos. Esse é o retorno concreto de manter `core` puro.
+
+---
+
+## Resumo das decisões
+
+| Decisão | Escolha | Motivo em uma linha |
+|---|---|---|
+| Linguagem | TypeScript full-stack | Tipos compartilhados entre domínio, API, web e app |
+| Rust/Go no back-end | Não agora | Carga é I/O-bound; reconsiderar só para o worker de sync, com medição |
+| Domínio | `packages/core` puro, sem I/O | Testável, e sobrevive a troca de framework |
+| API | Route handler fino, sem serviço separado ainda | Torna o app nativo um porte, não uma reescrita |
+| Isolamento | Postgres RLS | `where` esquecido retorna vazio, não dados alheios |
+| Dinheiro | Inteiros em centavos | Ponto flutuante erra centavo |
+| Sync | Serviço isolado por fila | Preserva a opção de portar para Go |
