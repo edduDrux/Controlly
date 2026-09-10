@@ -103,15 +103,34 @@ Capacitor                        shell nativo
 ### Backend
 
 ```
-Node + TypeScript (Fastify ou NestJS)
-PostgreSQL
+Node + TypeScript + Fastify      API HTTP
+Drizzle ORM                      schema, migrations, SQL quando precisar
+PostgreSQL                       Supabase ou Neon
+pg-boss                          fila de jobs, dentro do próprio Postgres
+Zod                              validação, compartilhada com o frontend
 ```
+
+**Fastify e não NestJS.** A estrutura deste projeto vem dos pacotes, não do framework: a lógica mora em `engine`, e a rota é transporte fino. NestJS cobraria cerimônia de módulo e injeção de dependência para organizar algo que já está organizado um nível acima. Fastify entrega roteamento, validação por schema e plugins, e sai da frente.
+
+**Drizzle e não Prisma.** Você vai escrever política de RLS, `SET LOCAL` em transação e consulta de projeção com agregação. Drizzle é fino sobre SQL e não briga com nada disso. Prisma abstrai mais do que ajuda quando o banco é parte do modelo de segurança.
+
+**pg-boss para fila.** O worker de sincronização precisa de agendamento e retentativa. pg-boss usa o Postgres que você já tem — zero infraestrutura nova. Redis e BullMQ só quando o volume justificar; até lá seria custo e uma peça a mais para operar.
 
 **Por que TypeScript no backend, e não Python:** existe uma vantagem específica deste projeto que decide o empate.
 
 > Se o **motor financeiro for um pacote TypeScript puro, sem I/O**, ele roda **no servidor e no cliente com o mesmo código**.
 
 Isso significa simulação "e se eu aportar mais R$ 300?" com slider respondendo **instantaneamente, sem round-trip**, e o mesmo código validando no servidor. Para uma tela de simulação de quitação, isso é a diferença entre brinquedo e ferramenta. Python não te dá isso.
+
+### Contrato da API: REST com OpenAPI, não tRPC
+
+tRPC é tentador — os dois lados são TypeScript. **Mas o Capacitor decide contra.**
+
+> Binário de loja **não pode ser forçado a atualizar.** Um usuário com a versão de três meses atrás vai bater no seu servidor de hoje.
+
+tRPC acopla cliente e servidor em tempo de build e não oferece nenhuma história de versionamento. Com app publicado, isso vira quebra silenciosa em device de terceiro — o pior lugar para descobrir.
+
+**Decisão:** REST, com os schemas Zod de `packages/domain` gerando **OpenAPI**. Você mantém a tipagem ponta a ponta (cliente gerado a partir do mesmo schema) e ganha um contrato explícito, versionável e inspecionável. Se o produto fosse web para sempre, tRPC seria a escolha certa. Não é o caso.
 
 ### Rust ou Go no backend?
 
@@ -143,7 +162,19 @@ Então a providência é arquitetural, não linguística: **mantenha o sync como
 
 ### Banco
 
-**PostgreSQL** com **Row Level Security**. Supabase ou Neon; Supabase entrega Postgres + Auth + RLS prontos e encurta bastante o caminho para um dev solo.
+**PostgreSQL** com **Row Level Security**. **Supabase** encurta o caminho para um dev solo: Postgres, Auth e RLS prontos.
+
+**Um detalhe que muda a implementação:** como o Capacitor exige API separada, você **não** usa o PostgREST do Supabase. O Fastify conecta direto no Postgres. Então o contexto do usuário é definido por você:
+
+```
+JWT do Supabase Auth
+   ↓ Fastify valida e extrai o user_id
+   ↓ abre transação
+   ↓ SET LOCAL app.user_id = '<uuid>'
+   ↓ queries rodam sob RLS
+```
+
+Escreva as políticas contra `current_setting('app.user_id', true)::uuid`, **não** contra `auth.uid()`. Duas vantagens: funciona com API própria, e trocar o Supabase Auth depois passa a ser trocar a verificação do JWT — não reescrever política nenhuma.
 
 ---
 
@@ -247,24 +278,95 @@ Criptografia em repouso para transações e, obrigatoriamente, para tokens do ag
 
 ---
 
-## 9. Estrutura sugerida
+### Ferramental e hospedagem
+
+```
+pnpm workspaces + Turborepo      monorepo
+Vitest                           testes de engine e API — rápidos
+Playwright                       E2E só dos fluxos críticos
+```
+
+**Hospedagem:** web é build estática (Cloudflare Pages, Vercel, Netlify — indiferente). **API e sync precisam de processo longo** — Fly.io, Railway ou Render. Serverless não serve para o worker de sincronização, que roda em agenda e mantém conexão de fila.
+
+---
+
+## 9. Estrutura do projeto
 
 ```
 controlly/
 ├─ apps/
-│  ├─ web/          Vite + React + Capacitor
-│  │  ├─ ios/
-│  │  └─ android/
-│  └─ api/          Fastify/NestJS
+│  ├─ web/                    Vite + React + Capacitor
+│  │  ├─ ios/  android/       gerados pelo Capacitor, versionados
+│  │  ├─ src/
+│  │  │  ├─ features/         organizado por domínio, não por tipo de arquivo
+│  │  │  │  ├─ timeline/      ⭐ a tela que define o produto
+│  │  │  │  ├─ compromissos/
+│  │  │  │  ├─ importacao/
+│  │  │  │  ├─ planos/        simulação, roda engine no cliente
+│  │  │  │  ├─ assistente/    chat com a IA
+│  │  │  │  └─ auth/
+│  │  │  ├─ components/ui/    primitivos compartilhados
+│  │  │  └─ lib/              cliente de API, storage seguro, ponte Capacitor
+│  │  ├─ capacitor.config.ts
+│  │  └─ vite.config.ts
+│  │
+│  ├─ api/                    Fastify
+│  │  └─ src/
+│  │     ├─ routes/           transporte fino: valida → autoriza → engine → serializa
+│  │     ├─ plugins/          auth, db, contexto de RLS, tratamento de erro
+│  │     ├─ services/         orquestração com I/O: repositórios, agregador, IA
+│  │     └─ server.ts
+│  │
+│  └─ sync/                   worker — o candidato a Go no futuro
+│     └─ src/jobs/            sincronizar-conexao, renovar-consentimento,
+│                             reconciliar-parcelas
 ├─ packages/
-│  ├─ engine/       ⭐ motor financeiro — TS puro, zero I/O, cobertura alta
-│  │                    roda no servidor E no cliente
-│  ├─ domain/       tipos e schemas compartilhados (Zod)
-│  └─ importers/    OFX, CSV, e depois adapters de Open Finance
-└─ docs/
+│  ├─ engine/                 ⭐ TS puro, ZERO I/O — servidor E cliente
+│  │  └─ src/
+│  │     ├─ dinheiro/         Centavos, aritmética, arredondamento
+│  │     ├─ compromissos/     inferência de parcelas, reconciliação
+│  │     ├─ projecao/         linha do tempo de caixa futuro
+│  │     └─ planos/           avalanche, bola de neve, antecipação
+│  │
+│  ├─ domain/                 tipos + schemas Zod — fonte única da verdade
+│  │  └─ src/
+│  │     ├─ entidades/
+│  │     └─ api/              contratos de request/response → gera OpenAPI
+│  │
+│  ├─ db/                     Drizzle: schema, migrations, políticas RLS
+│  │  └─ src/rls/             políticas versionadas junto do schema
+│  │
+│  ├─ importers/              OFX, CSV e adapters de Open Finance
+│  │  └─ src/openfinance/     ← trocável por agregador
+│  │
+│  └─ ai/                     ferramentas + orquestração — SOMENTE servidor
+│
+├─ docs/
+├─ turbo.json
+└─ package.json               pnpm workspaces
 ```
 
-`packages/engine` é o coração e o único lugar onde vive aritmética de dinheiro. Se ele tiver dependência de rede ou de banco, a decisão da seção 3 foi perdida — ele deixa de rodar no cliente.
+### Direção das dependências
+
+```
+        ┌─────────── domain ───────────┐
+        │       (tipos e schemas)      │
+        ↓                              ↓
+      web  ──────→  engine  ←──────  api  ──→  db, importers, ai
+                  (puro, sem I/O)              (só servidor)
+                                                  ↑
+                                                sync
+```
+
+### Três regras que sustentam a arquitetura
+
+**1. `engine` não conhece I/O.** Nenhum `fetch`, nenhum `pg`, nenhum `fs`. É o que permite rodá-lo no bundle do cliente para a simulação instantânea. Vale prender isso com regra de lint ou `dependency-cruiser` no CI — porque a violação é fácil, tentadora, e só dói meses depois.
+
+**2. `web` nunca importa `db` nem `ai`.** A chave de API e a credencial do banco não podem chegar perto do bundle — que é um zip que qualquer pessoa extrai. Mesma prisão por lint.
+
+**3. Rota é transporte, nunca lógica.** No máximo ~20 linhas. Se a regra for respeitada, a lógica não gruda no Fastify, o `engine` continua testável em memória, e trocar de framework um dia é trabalho de tarde.
+
+`packages/engine` é o coração e o único lugar onde existe aritmética de dinheiro. Se ele ganhar dependência de rede ou de banco, a decisão da seção 3 foi perdida — ele deixa de rodar no cliente e a simulação vira round-trip.
 
 ---
 
@@ -315,6 +417,6 @@ Assinatura, CNPJ, LGPD completa, lojas.
 ## 11. Decisões que ficam para depois
 
 - Ionic UI ou Tailwind puro — reversível, decidir ao construir a linha do tempo
-- Supabase ou Postgres gerenciado + auth própria — pesar velocidade contra dependência de fornecedor
+- Provedor de Postgres — Supabase é o padrão adotado; a política de RLS foi escrita para não depender dele
 - Qual agregador — decidir na Fase 2, **mas validar preço, cobertura e suporte a Capacitor agora**
 - Preço da assinatura — depende do custo real do agregador
