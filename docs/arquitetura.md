@@ -93,6 +93,22 @@ Tailwind                         mobile-first de verdade
 Capacitor                        shell nativo
 ```
 
+**Por que React?** Não por mérito técnico — é honesto dizer isso. O Capacitor exige SPA estática, e React, Vue, Svelte, Solid e Angular atendem igualmente. React ganha por dois motivos específicos **deste** projeto:
+
+1. **É a saída de emergência do Capacitor.** O empacotamento é uma aposta: se a Guideline 4.2 barrar, se o deep link do consentimento não fechar em device real, ou se a linha do tempo não performar, o plano B é React Native. Com React, o plano B preserva o modelo mental, a camada de dados e boa parte da lógica de componente. Com Svelte ou Vue, o plano B é reescrever a interface inteira. Como a seção 2.3 aponta o deep link como o maior risco técnico do projeto, ter essa saída barata vale mais do que elegância de framework.
+2. **Profundidade de ecossistema para a tela que define o produto.** A linha do tempo de caixa futuro é visualização customizada com gesto, virtualização e acessibilidade. É onde React tem a maior distância para os outros: visx, D3, virtualização, primitivos headless acessíveis. Nas alternativas isso existe, mas mais fino — e o custo aparece justamente no componente mais importante.
+
+Some a isso o fato de ser produto, não script pessoal: se entrar alguém no time, React é o maior pool de contratação no Brasil por larga margem.
+
+**Onde React vai custar, e é justo reconhecer:**
+
+- **Bundle maior.** React + React DOM partem de ~45 KB comprimidos antes da primeira linha sua. Svelte e Solid entregam menos. Em app instalado isso pesa pouco, mas não é zero.
+- **Modelo de re-render.** O slider de simulação — "e se eu aportar mais R$ 300?" — recalcula e repinta a cada movimento. A reatividade granular de Solid e Svelte serve esse padrão melhor, sem cerimônia. Em React isso exige disciplina de memoização no caminho quente, ou apoio do compilador.
+
+**Mitigação:** isole o caminho quente da simulação. O `engine` já é puro e síncrono, então o cálculo não é o problema — o problema é o repintar. Mantenha o estado do slider local ao componente da simulação, e não no topo da árvore.
+
+**Decisão reversível e barata.** `engine`, `domain` e `importers` não conhecem framework. Trocar de React é trocar `apps/web`, não o projeto.
+
 **Ionic UI ou não?** Você citou "Capacitor by Ionic" — vale saber que os dois são separáveis. Capacitor funciona sozinho, sem o framework de UI do Ionic.
 
 - **Ionic React**: componentes que parecem nativos, navegação e gestos prontos. Bom se quer cara de app.
