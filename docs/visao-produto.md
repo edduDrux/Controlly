@@ -240,14 +240,21 @@ Ignore "usuários ativos" no começo. Meça:
 
 ---
 
-## 10. Decisões em aberto
+## 10. Decisões tomadas
 
-Estas mudam materialmente a arquitetura e precisam ser respondidas antes do código:
+| Pergunta | Resposta |
+|---|---|
+| Uso pessoal ou produto? | **Pessoal primeiro, SaaS comercial como destino.** Multi-tenant no schema desde o commit 1 |
+| Plataforma | **Web mobile-first, empacotada com Capacitor** |
+| Agregador | Definir na Fase 2 — mas validar preço, cobertura e suporte a Capacitor desde já |
+| Modelo de IA | API hospedada, executada **somente no servidor** |
 
-1. **Uso pessoal ou produto multiusuário?** Muda autenticação, custo, LGPD, isolamento de dados e a decisão de self-hosting.
-2. **Plataforma:** web, mobile nativo, ou web responsivo primeiro?
-3. **Agregador:** decidir na Fase 2, mas já validar preço e cobertura de instituições agora, para não descobrir tarde que inviabiliza.
-4. **Modelo de IA:** API hospedada (melhor qualidade, custo por token, dado sai da máquina) ou modelo local (privacidade total, qualidade menor). O ponto de decisão é o quanto você aceita que agregados financeiros saiam do seu ambiente.
+O detalhamento técnico dessas escolhas, e o que cada uma impõe, está em **[arquitetura.md](arquitetura.md)**.
+
+Duas consequências que já valem aqui:
+
+- **"SaaS depois" não permite arquitetura de usuário único agora.** Isolamento de dados financeiros não se retrofita.
+- **O plano gratuito não pode incluir conexão bancária** — é o custo que escala e que você não controla. O gratuito é manual/OFX + linha do tempo; o pago é banco + IA. O paywall tem a mesma forma do roadmap.
 
 ---
 

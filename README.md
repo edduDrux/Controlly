@@ -13,8 +13,14 @@ O Controlly trata a **parcela futura como dívida de verdade**, mostra quanto do
 - **Somente leitura.** O app lê dados bancários. Nunca inicia pagamento, nunca pede senha de internet banking.
 - **Parcela é cidadã de primeira classe.** A entidade central do domínio é `Compromisso`, não `Transação`.
 
+## Stack
+
+Web mobile-first (Vite + React + TypeScript), empacotada com **Capacitor** para iOS e Android. Backend Node/TypeScript, PostgreSQL com Row Level Security. O motor financeiro é um pacote TypeScript puro, sem I/O, que roda no servidor e no cliente.
+
 ## Estado
 
 Fase de concepção. Sem código ainda.
 
-📄 **[Visão de produto completa](docs/visao-produto.md)** — posicionamento, modelo de domínio, arquitetura de dados e de IA, roadmap, riscos e decisões em aberto.
+📄 **[Visão de produto](docs/visao-produto.md)** — posicionamento, modelo de domínio, roadmap, riscos e métricas.
+
+🏗️ **[Arquitetura](docs/arquitetura.md)** — o que o Capacitor impõe, stack, multi-tenant, regras de dinheiro, camada de IA e a economia do SaaS.
