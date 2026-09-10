@@ -15,7 +15,7 @@ O Controlly trata a **parcela futura como dívida de verdade**, mostra quanto do
 
 ## Stack
 
-Web mobile-first (Vite + React + TypeScript), empacotada com **Capacitor** para iOS e Android. Backend Node/TypeScript, PostgreSQL com Row Level Security. O motor financeiro é um pacote TypeScript puro, sem I/O, que roda no servidor e no cliente.
+Web mobile-first em **Next.js** + TypeScript, PostgreSQL com Row Level Security. O motor financeiro é um pacote TypeScript puro, sem I/O, que roda no servidor **e** no cliente — é o que torna a simulação de quitação instantânea. Aplicativo nativo adiado, não cancelado.
 
 ## Estado
 
@@ -23,4 +23,4 @@ Fase de concepção. Sem código ainda.
 
 📄 **[Visão de produto](docs/visao-produto.md)** — posicionamento, modelo de domínio, roadmap, riscos e métricas.
 
-🏗️ **[Arquitetura](docs/arquitetura.md)** — o que o Capacitor impõe, stack, multi-tenant, regras de dinheiro, camada de IA e a economia do SaaS.
+🏗️ **[Arquitetura](docs/arquitetura.md)** — stack, estrutura do projeto, multi-tenant, regras de dinheiro, camada de IA e a economia do SaaS.

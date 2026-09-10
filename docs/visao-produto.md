@@ -204,25 +204,24 @@ Domínio + RLS, import OFX/CSV, entrada manual, inferência de parcelas, linha d
 *Saída:* você usa todo dia, sem banco conectado.
 
 **Portão paralelo — Validar a economia unitária**
-Preço real por conexão/mês dos agregadores, cobertura e suporte a Capacitor. Em SaaS o agregador é custo variável por usuário e define o preço mínimo da assinatura. **É portão, não tarefa:** se a conta não fechar, o modelo de negócio muda antes de existir código de integração.
-
-**Fase 0.5 — Casca nativa**
-Capacitor, biometria, armazenamento seguro, build nas duas plataformas.
-*Por que cedo:* descobrir dor de empacotamento com 5 telas, não com 40.
+Preço real por conexão/mês dos agregadores e cobertura de instituições. Em SaaS o agregador é custo variável por usuário e define o preço mínimo da assinatura. **É portão, não tarefa:** se a conta não fechar, o modelo de negócio muda antes de existir código de integração.
 
 **Fase 1 — Inteligência (pago)**
 Motor de planos com testes, chat com tool calling, categorização em cascata.
 *Saída:* o app te diz algo sobre seu dinheiro que você não sabia.
 
 **Fase 2 — Open Finance (pago)**
-Semana 1: provar o fluxo de deep link em device real — maior risco técnico do projeto. Depois sandbox → um banco → demais. Reconciliação de parcelas.
+Sandbox → um banco → demais. Reconciliação de parcelas. Na web o consentimento é redirect comum, o que tirou o maior risco técnico que o projeto tinha.
 *Para SaaS esta fase é existencial, não opcional:* é ela que entrega a promessa de "sem digitação".
 
 **Fase 3 — Automação**
-Push de fatura projetada, gasto-fantasma, alerta de comprometimento excessivo.
+Alerta de fatura projetada, gasto-fantasma, comprometimento excessivo — por e-mail e web push.
 
 **Fase 4 — Comercial**
-Assinatura, CNPJ, LGPD completa, submissão às lojas.
+Assinatura, CNPJ, LGPD completa.
+
+**Depois — Mobile, se a tração justificar**
+Ver Apêndice A da arquitetura.
 
 ---
 
@@ -231,10 +230,8 @@ Assinatura, CNPJ, LGPD completa, submissão às lojas.
 | Risco | Mitigação |
 |---|---|
 | **Custo do agregador inviabiliza o preço de assinatura** | Portão paralelo à Fase 0. Validar antes de construir a integração |
-| **Deep link do consentimento não funciona em device real** | Prototipar na semana 1 da Fase 2, antes de qualquer outra coisa. Bancos bloqueiam WebView embarcada |
 | **Vazamento de dados financeiros de terceiros** | RLS no banco, criptografia de tokens em cofre, nunca logar payload, auditoria. Escopo somente leitura limita o dano máximo |
 | Custo de IA por usuário sem teto | Cascata de categorização, cache de merchants, rate limit por usuário, agregados em vez de extrato bruto |
-| Rejeição na App Store por Guideline 4.2 | Biometria, push e armazenamento seguro nativos desde a Fase 0.5 |
 | Consentimento expira e o usuário some | Renovação proativa com aviso antecipado; o app degrada para manual, não quebra |
 | LLM inventa número | Tool calling obrigatório + testes do motor + log de origem de cada valor exibido |
 | Concorrente com capital copia | O fosso não é a feature, é o motor de inferência e reconciliação de parcelas — exige tempo e dados reais |
@@ -266,8 +263,9 @@ Assinatura, CNPJ, LGPD completa, submissão às lojas.
 | Pergunta | Resposta |
 |---|---|
 | Uso pessoal ou produto? | **Pessoal primeiro, SaaS comercial como destino.** Multi-tenant no schema desde o commit 1 |
-| Plataforma | **Web mobile-first, empacotada com Capacitor** |
-| Agregador | Definir na Fase 2 — mas validar preço, cobertura e suporte a Capacitor desde já |
+| Plataforma | **Web mobile-first.** Aplicativo nativo adiado, não cancelado |
+| Framework | **Next.js** (App Router) |
+| Agregador | Definir na Fase 2 — mas validar preço e cobertura desde já |
 | Modelo de IA | API hospedada, executada **somente no servidor** |
 | Stack | **TypeScript full-stack** — o motor roda no servidor e no cliente com o mesmo código |
 | Rust/Go no backend | **Não.** Carga é I/O-bound e o motor precisa rodar no cliente. Reconsiderar só para o worker de sync, com medição |
