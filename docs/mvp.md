@@ -5,180 +5,201 @@
 
 ---
 
-## 1. O que o MVP precisa provar
+## 1. A premissa: a conexão bancária é o core
 
-Uma coisa só:
+Uma versão anterior deste documento propunha um MVP de cadastro manual, deixando a conexão para depois. **Estava errado, e por um motivo específico.**
 
-> **Que ver o comprometimento futuro muda decisão.**
+Um MVP existe para testar a suposição mais arriscada. Este projeto tem duas:
 
-Se você olhar a linha do tempo e mudar de ideia sobre parcelar algo — o produto tem razão de existir. Se olhar, achar interessante e não mudar nada, a tese está errada, e é muito melhor descobrir isso com quatro semanas de trabalho do que com oito meses.
-
-Tudo que não serve a essa prova fica de fora. Sem exceção.
-
-**O que o MVP não é:** lançamento. Ele é a Fase 0 — o plano gratuito e o seu próprio dogfooding. Produto vendável só existe depois da conexão bancária, na Fase 2.
-
----
-
-## 2. A decisão desconfortável: o MVP é de digitação manual
-
-Isso parece contradizer o pedido original — *"não quero digitar todos os meus gastos manualmente"*. Não contradiz, e a distinção é a coisa mais importante deste documento:
-
-> **Você não vai digitar transações. Você vai digitar compromissos. São coisas de ordem de grandeza diferente.**
-
-| | Quantidade | Esforço |
+| Suposição | Se for falsa | Custo de descobrir tarde |
 |---|---|---|
-| Transações de um mês | ~80 a 150 | Insuportável. É o que mata app de finanças |
-| **Compromissos ativos** | **~10 a 25** | **15 minutos, uma vez** |
+| Ver o comprometimento futuro muda decisão | O produto não tem razão de existir | Alto |
+| **Dá para extrair parcelas do Open Finance de forma confiável** | **Não existe produto — só uma planilha com login** | **Fatal** |
 
-Uma compra em 10x é **um cadastro** que gera **dez parcelas**. Vinte compromissos geram algo em torno de duzentas parcelas futuras — a linha do tempo inteira, a partir de quinze minutos de digitação.
+A segunda é a mais cara de errar, e é a única que não tem plano B. Um MVP manual testaria só a primeira — e ainda por cima mal, porque poderia falhar por atrito de digitação em vez de por a tese ser falsa.
 
-O que você odeia é registrar cafezinho. O MVP não precisa de cafezinho: **precisa do que já está comprometido.** E isso é pouco, é estável, e você lembra de cabeça.
+Some a isso o fato de ser SaaS: **ninguém paga por app de digitação manual.** A disposição a pagar mora na automação. Um MVP sem conexão não é um produto menor — é outro produto.
 
-**Por que isso é a escolha certa e não corte de canto:**
-
-- Importar OFX e CSV exige parser, deduplicação, normalização de estabelecimento e reconciliação — semanas de trabalho que **reduzem atrito**, não que **testam a tese**.
-- Se a tese estiver errada, esse trabalho todo vira lixo.
-- Se estiver certa, você constrói a importação sabendo exatamente qual formato de dado importa, porque já viu o modelo funcionando com dados reais.
-
-Importação entra na v1.1, logo depois. Conexão bancária na Fase 2.
+**Portanto: o MVP é "conecte seu cartão e veja seus próximos 12 meses".**
 
 ---
 
-## 3. A única jornada do MVP
+## 2. A primeira coisa a fazer, antes de qualquer código de produto
+
+> **Um spike de dados no sandbox de um agregador. Prazo: dias, não semanas.**
+
+A arquitetura registra uma suposição técnica que nunca foi verificada: *"Open Finance não entrega o cronograma completo de parcelas de forma confiável — o Controlly precisa inferir e reconciliar."*
+
+Essa frase é o produto inteiro apoiado numa hipótese. Verifique antes de construir em cima dela.
+
+**O que o spike precisa responder:**
+
+1. As transações de cartão vêm com identificação de parcela? Em campo estruturado, ou só na descrição?
+2. Qual a **janela de histórico** disponível? Determina quantos compromissos antigos você consegue reconstruir
+3. Uma compra em 10x aparece como **um** registro com cronograma, ou como parcelas soltas entrando a cada fatura?
+4. A descrição é suja o bastante para exigir normalização? Quão suja?
+5. Faturas futuras já fechadas aparecem?
+
+Sandbox costuma ter tier gratuito e não exige contrato. **Isso derruba o maior risco do projeto por alguns dias de trabalho** — e o resultado define o modelo de dados, não o contrário.
+
+Se o spike mostrar que os dados são piores do que se espera, você ainda tem produto: o motor de inferência vira o diferencial, exatamente como a visão previu. Mas você vai saber disso **antes**, e não depois de construir o resto.
+
+---
+
+## 3. Dois portões comerciais que começam agora
+
+Não bloqueiam o spike, mas bloqueiam a produção. Resolva em paralelo, desde já:
+
+**CNPJ.** Agregadores em geral contratam com pessoa jurídica, não física. Vale perguntar a cada fornecedor se MEI atende — é o caminho mais rápido para ter CNPJ. Descobrir isso na véspera do lançamento é atraso puro.
+
+**Preço por conexão.** Em SaaS o agregador é custo variável por usuário: três contas conectadas custam 3×, antes de qualquer receita. Isso define o preço mínimo da assinatura e, portanto, se o negócio fecha. Obtenha número real de Pluggy, Belvo e Klavi.
+
+---
+
+## 4. O manual não sai de cena — e não é concessão
+
+Mesmo com o banco conectado, o cadastro manual **é requisito permanente**, não escopo de consolo:
+
+- **Compromissos anteriores à janela de histórico.** Uma compra de 18 meses atrás em 24x pode não ter origem visível. Sem cadastro manual, ela some da sua linha do tempo — e a linha do tempo passa a mentir
+- **Cobertura de instituição.** Nem todo banco responde bem, nem todo cartão aparece
+- **Consentimento expira.** Até a renovação, o app precisa continuar funcionando
+- **Dinheiro e boleto** não passam por Open Finance
+
+E o custo é baixo: com o modelo de domínio já existente, cadastro manual é um formulário sobre as mesmas tabelas. Não é semana de trabalho — o que era caro é o **parser de OFX e CSV**, que continua fora.
+
+> A regra: **conexão é o caminho feliz, manual é a rede de segurança.** Sempre visível, nunca obrigatório.
+
+---
+
+## 5. A jornada do MVP
 
 ```
-cadastra renda mensal
+cria conta
       ↓
-cadastra os cartões (fechamento e vencimento)
+conecta o cartão  ← o momento que define o produto
       ↓
-cadastra os compromissos que já tem
+sync + inferência de parcelas
       ↓
-  ⭐ vê a linha do tempo dos próximos 12 meses
+   ⭐ linha do tempo dos próximos 12 meses
       ↓
    "38% dos meus próximos 6 meses já está gasto"
+      ↓
+completa o que faltou, manualmente (opcional)
 ```
 
-A última linha é o **momento de virada**. Todo o resto do MVP existe para o usuário chegar nela rápido.
-
-Consequência de design: **o formulário de compromisso é a peça mais importante depois da linha do tempo.** Se cadastrar for chato, ninguém chega ao momento de virada e o teste da tese falha por motivo errado — atrito de interface, não tese furada. Vale investir desproporcionalmente em fazer esse formulário rápido.
+Duas telas carregam o produto: a **conexão** e a **linha do tempo**. Todo o resto é apoio.
 
 ---
 
-## 4. Escopo — o que entra
+## 6. Escopo — o que entra
 
 **Conta e acesso**
 - Cadastro e login
-- Multi-tenant com RLS desde a primeira migration, mesmo com um usuário só
+- Multi-tenant com RLS desde a primeira migration
 
-**Configuração**
-- Renda mensal prevista (um valor recorrente basta)
-- Cartões: apelido, **dia de fechamento** e **dia de vencimento** — são campos distintos
+**Conexão bancária**
+- Widget do agregador, com redirect de consentimento (na web é redirect comum)
+- Uma instituição para começar — a que você usa
+- Sync de transações de cartão de crédito
+- Status visível: "atualizado em", consentimento a expirar, falha de sync
+
+**⭐ Motor de inferência de parcelas**
+O coração técnico do MVP:
+- Reconhecer `PARCELA 3/10`, `03/10`, `PARC 3 DE 10` e as variações que o spike revelar
+- Agrupar parcelas dispersas num único compromisso
+- Projetar as parcelas futuras que ainda não entraram em fatura
+- Reconciliar cada parcela nova contra o compromisso já projetado, sem duplicar
 
 **Compromissos**
-- Compra parcelada: descrição, valor da parcela, nº de parcelas, data da primeira, cartão
-- Assinatura recorrente: valor, dia, sem fim definido
-- Geração automática das parcelas
-- Editar e excluir
-- Marcar parcela como paga
+- Gerados pela inferência, revisáveis pelo usuário
+- Cadastro manual — parcelada e assinatura
+- Editar, excluir, marcar parcela como paga
 
 **⭐ Linha do tempo**
-- Próximos 12 meses, mês a mês
-- Por mês: renda prevista, total comprometido, **saldo livre**
-- Percentual comprometido — o número que gera a virada
+- Próximos 12 meses: renda prevista, total comprometido, saldo livre, percentual
 - Abrir um mês e ver as parcelas que o compõem
 
-Só isso. É pequeno de propósito.
+**Configuração**
+- Renda mensal prevista
+- Cartões: fechamento e vencimento
 
 ---
 
-## 5. Escopo — o que fica de fora, e por quê
+## 7. Escopo — o que fica de fora
 
 | Fora | Por quê |
 |---|---|
-| Importação OFX/CSV | Reduz atrito, não testa a tese. v1.1 |
-| Conexão bancária | Fase 2. É o produto pago, não o MVP |
-| IA e chat | Fase 1. Sem dados reais no modelo, não há o que explicar |
-| Planos de quitação | Fase 1. Primeiro provar que **ver** muda decisão; depois otimizar |
+| Importação OFX/CSV | O parser é caro e a conexão cobre o mesmo terreno melhor |
+| IA e chat | Fase seguinte. Primeiro os dados precisam estar certos |
+| Planos de quitação | Fase seguinte. Primeiro provar que **ver** muda decisão |
 | Categorias e gráfico de gastos | É o app que você **não** está construindo |
-| Transações avulsas | O MVP é de compromissos. Gasto do dia a dia não é o produto |
-| Detecção de assinatura esquecida | Precisa de histórico de transação |
+| Conta corrente | O produto é sobre compromissos, e eles vivem no cartão |
+| Detecção de assinatura esquecida | Depois, com histórico acumulado |
 | Alertas e notificação | Fase 3 |
-| Cobrança e assinatura | Fase 4 |
-| Empréstimo e financiamento | Cabe no modelo, mas tem cronograma com juros. v1.1 |
+| Cobrança e assinatura | Fase 4 — mas o preço já precisa ser conhecido, ver seção 3 |
+| Múltiplas instituições | Uma só no MVP. A segunda é configuração, não arquitetura |
 
 ---
 
-## 6. O detalhe que quase todo mundo erra
+## 8. Três armadilhas que decidem se funciona no dia 1
 
-**Compromisso que já está em andamento.**
+**Compromisso já em andamento.** No primeiro dia ninguém tem compras novas — tem compras no meio. "Estou na parcela 3 de 10." A inferência precisa disso, e o cadastro manual também. Se só aceitar compra nova, o app nasce inútil.
 
-No dia em que você começa a usar, você não tem compras novas — tem compras **no meio**. "Estou na parcela 3 de 10."
+**Valor da parcela, não valor total.** A pessoa lembra "10x de R$ 89,90", não "R$ 899,00" — e com juros os dois nem batem. Peça a parcela e derive o total; o resto da divisão vai para a primeira parcela.
 
-Se o formulário só aceitar compra nova, o app fica inútil no primeiro dia e o usuário nunca chega ao momento de virada. Então:
-
-- O cadastro **precisa** aceitar "já paguei N parcelas"
-- As parcelas já pagas entram como `paga`, não somem — o histórico importa para o total do compromisso
-- A linha do tempo começa da próxima parcela em aberto
-
-Isso não é refinamento. É requisito de MVP, e é o tipo de coisa que se descobre tarde demais.
-
-**Dois outros que doem:**
-
-- **Valor da parcela, não valor total.** A pessoa lembra "10x de R$ 89,90", não "R$ 899,00". Peça a parcela e derive o total. Com juros os dois nem batem, e o resto da divisão vai para a primeira parcela, pela convenção da seção de dinheiro da arquitetura.
-- **Fechamento ≠ vencimento.** Compra depois do fechamento cai na fatura seguinte. Errar isso joga a parcela no mês errado e a linha do tempo passa a mentir — justamente a tela que precisa ser confiável.
+**Fechamento ≠ vencimento.** Compra depois do fechamento cai na fatura seguinte. Errar joga a parcela no mês errado, e a linha do tempo mente justamente onde precisa ser confiável.
 
 ---
 
-## 7. Modelo de dados mínimo
+## 9. Ordem de construção
+
+1. **Spike de dados no sandbox** — sem código de produto. Só descobrir o que existe
+2. **`packages/engine`** — `Centavos`, aritmética, geração e inferência de parcelas, **modelada sobre o que o spike encontrou**. Com testes, sem UI
+3. **Schema + RLS + teste de isolamento no CI** — antes de existir dado para vazar
+4. **Auth e casca do app**
+5. **Conexão e sync** — widget, consentimento, ingestão, reconciliação
+6. **Linha do tempo**
+7. **Cadastro manual** como complemento
+8. **Polimento do onboarding** — da criação de conta até a linha do tempo preenchida
+
+O passo 1 antes do 2 é o ponto todo deste documento: **o modelo de domínio deve ser desenhado sobre dados reais, não sobre suposição.**
+
+---
+
+## 10. Critérios de sucesso
+
+**Técnico** — vem primeiro, porque habilita o resto:
+- A inferência acerta os compromissos parcelados do seu cartão real
+- A linha do tempo bate com suas faturas de verdade
+- Nova fatura reconcilia sem duplicar parcela
+
+**Produto** — depois de quatro semanas de uso:
+- Você usou nas quatro semanas
+- **Você tomou pelo menos uma decisão diferente por causa da linha do tempo.** Este é *o* critério
+
+**Negócio:**
+- Custo real por usuário conectado é conhecido, e o preço fecha
+
+---
+
+## 11. O que isso muda no modelo de negócio
+
+Nada na **forma** do paywall — mas inverte a **ordem de construção**.
 
 ```
-usuario
-renda            valor_centavos, dia_recebimento
-cartao           apelido, dia_fechamento, dia_vencimento
-compromisso      tipo (parcelada | assinatura), descricao,
-                 cartao_id?, valor_parcela_centavos, total_parcelas?,
-                 data_primeira
-parcela          compromisso_id, numero, vencimento (date),
-                 valor_centavos, status (prevista | paga)
+GRÁTIS   cadastro manual + linha do tempo      custo marginal ~ zero
+PAGO     conexão automática + IA               onde está o seu custo
 ```
 
-Sete tabelas contando `usuario`. Todas com `user_id NOT NULL` e RLS ligada.
+Antes, a ideia era construir o gratuito primeiro e o pago depois. Agora você **constrói o pago primeiro**, e o gratuito é o que sobra quando se remove a conexão — porque o cadastro manual já existe como rede de segurança.
 
-Repare no que **não** existe ainda: `transacao`, `categoria`, `regra`, `fatura`, `plano`. Entram quando a importação entrar — e o modelo da arquitetura já prevê o lugar delas.
-
----
-
-## 8. Ordem de construção
-
-A ordem importa tanto quanto o escopo:
-
-1. **Monorepo + `packages/engine`** — tipo `Centavos`, aritmética, arredondamento, geração de parcelas a partir de um compromisso. **Com testes, sem nenhuma UI.**
-2. **Schema + RLS + teste de isolamento no CI** — antes de existir dado para vazar.
-3. **Auth e casca do app.**
-4. **CRUD de cartão e compromisso**, com o formulário rápido da seção 3.
-5. **Linha do tempo.**
-6. **Polimento do fluxo de entrada** — porque é ele que decide se alguém chega ao momento de virada.
-
-**Por que nessa ordem:** os passos 1 e 2 são onde mora o risco real — lógica de dinheiro e isolamento de dados. Resolvidos primeiro, sem UI para atrapalhar, e testáveis em milissegundos. Interface é a parte fácil de mudar; essas duas não são.
+É melhor assim: você lança com a coisa pela qual as pessoas pagam, e o plano gratuito vira aquisição sem custo adicional de desenvolvimento.
 
 ---
 
-## 9. Critérios de sucesso
+## 12. Anti-escopo
 
-O MVP deu certo se, depois de quatro semanas:
-
-- **Você usou nas quatro semanas.** Abandono é a resposta mais honesta que existe
-- **A linha do tempo bate com a realidade** — confira contra suas faturas de verdade
-- **Você tomou pelo menos uma decisão diferente por causa dela.** Este é *o* critério
-- **O modelo de domínio aguentou seus casos reais sem gambiarra** — validação técnica, e é a que autoriza construir a importação em cima
-
-Se o terceiro não acontecer, pare e repense o produto antes de construir a Fase 1. É exatamente para isso que o MVP é pequeno.
-
----
-
-## 10. Anti-escopo
-
-Pedidos que vão aparecer durante a construção e que devem ir para o backlog, não para a sprint:
+Pedidos que vão aparecer e que devem ir para o backlog:
 
 - "Já que estou aqui, deixa eu adicionar categoria"
 - "Seria legal um gráfico de pizza dos gastos"
@@ -186,4 +207,4 @@ Pedidos que vão aparecer durante a construção e que devem ir para o backlog, 
 - "E se tivesse orçamento por categoria?"
 - "Dá para colocar meus investimentos?"
 
-Todos são features razoáveis de um app de finanças. **Nenhum ajuda a provar que ver o comprometimento futuro muda decisão** — e cada um adia a resposta.
+Todos são features razoáveis de um app de finanças. **Nenhum ajuda a provar que a conexão entrega parcelas confiáveis e que ver o futuro muda decisão** — e cada um adia a resposta.

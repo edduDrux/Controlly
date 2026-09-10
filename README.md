@@ -21,7 +21,7 @@ Web mobile-first em **Next.js** + TypeScript, PostgreSQL com Row Level Security.
 
 Fase de concepção. Sem código ainda.
 
-🎯 **[MVP](docs/mvp.md)** — o que entra, o que fica de fora e a ordem de construção.
+🎯 **[MVP](docs/mvp.md)** — a conexão bancária como core, o spike de dados que vem antes de tudo, e o que fica de fora.
 
 📄 **[Visão de produto](docs/visao-produto.md)** — posicionamento, modelo de domínio, roadmap, riscos e métricas.
 

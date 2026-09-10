@@ -194,31 +194,24 @@ Se for uso estritamente pessoal (self-hosted), boa parte disso simplifica — ma
 
 ## 7. Roadmap
 
-> Revisado após as decisões de escopo e plataforma. A mudança mais honesta: para uso pessoal, a Fase 0 já seria um produto. **Para SaaS, a Fase 0 sozinha não é vendável** — ninguém paga por um app onde ainda importa arquivo à mão. A ordem continua certa, mas o papel de cada fase muda: a Fase 0 vira o **plano gratuito**, não o lançamento.
+> A conexão bancária é o core do produto, não uma fase posterior. O detalhamento do recorte está em **[mvp.md](mvp.md)**.
 
-Detalhamento técnico de cada fase em **[arquitetura.md](arquitetura.md)**.
+**Fase 0 — Spike de dados** *(dias)*
+Sandbox de agregador. Descobrir como parcelas de cartão realmente chegam: campo estruturado ou descrição, janela de histórico, formato. **Nenhum código de produto antes disso** — é o que define o modelo de domínio.
+*Em paralelo, e são portões:* CNPJ e preço por conexão.
 
-**Fase 0 — Núcleo (grátis)**
-Domínio + RLS, import OFX/CSV, entrada manual, inferência de parcelas, linha do tempo de caixa futuro. Web responsiva.
-*Papel:* derisking e dogfooding. Você é o usuário zero e valida o modelo contra a sua vida financeira real, onde os casos estranhos aparecem.
-*Saída:* você usa todo dia, sem banco conectado.
+**Fase 1 — MVP: conectar e enxergar** *(o produto)*
+Motor de inferência e reconciliação de parcelas, conexão com uma instituição, linha do tempo de 12 meses, cadastro manual como rede de segurança.
+*Saída:* a linha do tempo bate com suas faturas reais, e você mudou uma decisão por causa dela.
 
-**Portão paralelo — Validar a economia unitária**
-Preço real por conexão/mês dos agregadores e cobertura de instituições. Em SaaS o agregador é custo variável por usuário e define o preço mínimo da assinatura. **É portão, não tarefa:** se a conta não fechar, o modelo de negócio muda antes de existir código de integração.
-
-**Fase 1 — Inteligência (pago)**
-Motor de planos com testes, chat com tool calling, categorização em cascata.
-*Saída:* o app te diz algo sobre seu dinheiro que você não sabia.
-
-**Fase 2 — Open Finance (pago)**
-Sandbox → um banco → demais. Reconciliação de parcelas. Na web o consentimento é redirect comum, o que tirou o maior risco técnico que o projeto tinha.
-*Para SaaS esta fase é existencial, não opcional:* é ela que entrega a promessa de "sem digitação".
+**Fase 2 — Inteligência**
+Motor de planos de quitação com testes, chat com tool calling, categorização em cascata.
 
 **Fase 3 — Automação**
 Alerta de fatura projetada, gasto-fantasma, comprometimento excessivo — por e-mail e web push.
 
 **Fase 4 — Comercial**
-Assinatura, CNPJ, LGPD completa.
+Assinatura, LGPD completa, plano gratuito (que é o MVP sem a conexão).
 
 **Depois — Mobile, se a tração justificar**
 Ver Apêndice A da arquitetura.
@@ -229,7 +222,9 @@ Ver Apêndice A da arquitetura.
 
 | Risco | Mitigação |
 |---|---|
+| **Parcelas não vêm utilizáveis do Open Finance** | **Spike de dados na Fase 0, antes de qualquer código.** É a suposição que, se falsa, derruba o produto |
 | **Custo do agregador inviabiliza o preço de assinatura** | Portão paralelo à Fase 0. Validar antes de construir a integração |
+| Agregador não contrata com pessoa física | Resolver CNPJ em paralelo à Fase 0, não na véspera |
 | **Vazamento de dados financeiros de terceiros** | RLS no banco, criptografia de tokens em cofre, nunca logar payload, auditoria. Escopo somente leitura limita o dano máximo |
 | Custo de IA por usuário sem teto | Cascata de categorização, cache de merchants, rate limit por usuário, agregados em vez de extrato bruto |
 | Consentimento expira e o usuário some | Renovação proativa com aviso antecipado; o app degrada para manual, não quebra |
