@@ -194,36 +194,35 @@ Se for uso estritamente pessoal (self-hosted), boa parte disso simplifica — ma
 
 ## 7. Roadmap
 
-> Revisado após a decisão de ser **SaaS**. A mudança é honesta e importante: para uso pessoal, a Fase 0 já seria um produto. Para SaaS, **a Fase 0 sozinha não é vendável** — ninguém paga por um app onde ainda precisa importar arquivo à mão. A ordem continua certa, mas o papel de cada fase muda.
+> Revisado após as decisões de escopo e plataforma. A mudança mais honesta: para uso pessoal, a Fase 0 já seria um produto. **Para SaaS, a Fase 0 sozinha não é vendável** — ninguém paga por um app onde ainda importa arquivo à mão. A ordem continua certa, mas o papel de cada fase muda: a Fase 0 vira o **plano gratuito**, não o lançamento.
 
-### Fase 0 — Núcleo e dogfooding
-Modelo de domínio, `Compromisso`/`Parcela`, importação OFX/CSV, entrada manual, linha do tempo de caixa futuro.
-**Papel:** não é lançamento, é *derisking*. Você é o usuário zero e valida o modelo contra a sua vida financeira real, onde os casos estranhos aparecem.
-**Critério de saída:** você usa todo dia sem integração bancária, e o modelo de domínio sobreviveu ao contato com a realidade.
+Detalhamento técnico de cada fase em **[arquitetura.md](arquitetura.md)**.
 
-### Fase 0.5 — Validação de economia unitária *(em paralelo, e é um portão)*
-Falar com Pluggy, Belvo, Klavi e obter **preço real por conexão ativa/mês** e cobertura de instituições.
+**Fase 0 — Núcleo (grátis)**
+Domínio + RLS, import OFX/CSV, entrada manual, inferência de parcelas, linha do tempo de caixa futuro. Web responsiva.
+*Papel:* derisking e dogfooding. Você é o usuário zero e valida o modelo contra a sua vida financeira real, onde os casos estranhos aparecem.
+*Saída:* você usa todo dia, sem banco conectado.
 
-Por que isso virou crítico agora: em SaaS, o agregador é **custo variável por usuário**. Se cada usuário conecta 3 instituições, seu custo mensal é 3× o preço por conexão — antes de qualquer receita. O mercado brasileiro de finanças pessoais tem âncora de preço baixa. Se a conta não fecha, o modelo de negócio precisa mudar (limite de conexões no plano gratuito, cobrança por conexão, B2B2C via cooperativa ou fintech), e **é muito melhor descobrir isso agora do que na Fase 2.**
+**Portão paralelo — Validar a economia unitária**
+Preço real por conexão/mês dos agregadores, cobertura e suporte a Capacitor. Em SaaS o agregador é custo variável por usuário e define o preço mínimo da assinatura. **É portão, não tarefa:** se a conta não fechar, o modelo de negócio muda antes de existir código de integração.
 
-**Critério de saída:** você sabe o custo por usuário e o preço mínimo viável de assinatura.
+**Fase 0.5 — Casca nativa**
+Capacitor, biometria, armazenamento seguro, build nas duas plataformas.
+*Por que cedo:* descobrir dor de empacotamento com 5 telas, não com 40.
 
-### Fase 1 — Motor determinístico e camada de IA
-Motor de planos com testes. Chat com tool calling. Categorização em cascata com teto de custo por usuário.
-**Critério de saída:** o app te diz algo sobre seu dinheiro que você não sabia.
+**Fase 1 — Inteligência (pago)**
+Motor de planos com testes, chat com tool calling, categorização em cascata.
+*Saída:* o app te diz algo sobre seu dinheiro que você não sabia.
 
-### Fase 2 — Open Finance e endurecimento multi-tenant
-Sandbox → uma instituição real → demais. Motor de reconciliação de parcelas. RLS, criptografia de tokens e auditoria validados sob dados de terceiros.
-**Para SaaS esta fase é existencial, não opcional** — é ela que entrega a promessa de "sem digitação".
+**Fase 2 — Open Finance (pago)**
+Semana 1: provar o fluxo de deep link em device real — maior risco técnico do projeto. Depois sandbox → um banco → demais. Reconciliação de parcelas.
+*Para SaaS esta fase é existencial, não opcional:* é ela que entrega a promessa de "sem digitação".
 
-### Fase 3 — Lançamento
-LGPD, termos de uso, política de privacidade, encarregado de dados, pagamento, onboarding, suporte.
+**Fase 3 — Automação**
+Push de fatura projetada, gasto-fantasma, alerta de comprometimento excessivo.
 
-### Fase 4 — Aplicativo nativo
-React Native reusando `@controlly/core` e o cliente de API. Só depois de tração na web — e possível **sem reescrita** por causa da decisão API-first (ver `arquitetura.md`).
-
-### Fase 5 — Automação
-Alerta de fatura projetada, detecção de assinatura esquecida, aviso de comprometimento excessivo, apoio a renegociação.
+**Fase 4 — Comercial**
+Assinatura, CNPJ, LGPD completa, submissão às lojas.
 
 ---
 
@@ -231,12 +230,14 @@ Alerta de fatura projetada, detecção de assinatura esquecida, aviso de comprom
 
 | Risco | Mitigação |
 |---|---|
-| **Custo do agregador inviabiliza o preço de assinatura** | Fase 0.5 é portão explícito. Validar antes de construir a integração |
-| **Vazamento de dados financeiros de terceiros** | RLS no banco, criptografia de tokens em cofre de chaves, nunca logar payload, auditoria. Escopo somente leitura limita o dano máximo |
-| Custo de IA por usuário sem teto | Cascata de categorização, cache de merchants, quota por plano, agregados em vez de extrato bruto |
+| **Custo do agregador inviabiliza o preço de assinatura** | Portão paralelo à Fase 0. Validar antes de construir a integração |
+| **Deep link do consentimento não funciona em device real** | Prototipar na semana 1 da Fase 2, antes de qualquer outra coisa. Bancos bloqueiam WebView embarcada |
+| **Vazamento de dados financeiros de terceiros** | RLS no banco, criptografia de tokens em cofre, nunca logar payload, auditoria. Escopo somente leitura limita o dano máximo |
+| Custo de IA por usuário sem teto | Cascata de categorização, cache de merchants, rate limit por usuário, agregados em vez de extrato bruto |
+| Rejeição na App Store por Guideline 4.2 | Biometria, push e armazenamento seguro nativos desde a Fase 0.5 |
 | Consentimento expira e o usuário some | Renovação proativa com aviso antecipado; o app degrada para manual, não quebra |
 | LLM inventa número | Tool calling obrigatório + testes do motor + log de origem de cada valor exibido |
-| Concorrente com capital copia | O fosso não é a feature, é o motor de inferência e reconciliação de parcelas — que exige tempo e dados reais |
+| Concorrente com capital copia | O fosso não é a feature, é o motor de inferência e reconciliação de parcelas — exige tempo e dados reais |
 | Escopo infinito (investimento, imposto, orçamento familiar…) | O produto é **compromissos futuros**. Pedido fora disso vai para o backlog |
 | Regra regulatória muda | Tudo de Open Finance isolado atrás do adapter |
 
@@ -251,26 +252,32 @@ Alerta de fatura projetada, detecção de assinatura esquecida, aviso de comprom
 - Taxa de acerto da categorização automática
 - **Planos gerados vs. planos seguidos** — a segunda é a única que prova valor
 
-**Negócio (a partir da Fase 3)**
+**Negócio (a partir da Fase 4)**
 - Custo de agregador + IA por usuário ativo
 - Margem por assinante
-- Conexões bancárias por usuário (dirige o custo)
+- Conexões bancárias por usuário — dirige o custo
+- Conversão do gratuito para o pago
 - Retenção no mês 3 — em finanças pessoais é onde o abandono aparece
 
 ---
 
 ## 10. Decisões tomadas
 
-| Decisão | Escolha | Consequência principal |
-|---|---|---|
-| **Escopo** | Produto SaaS multiusuário | Multi-tenancy com isolamento no banco, LGPD completa, e economia unitária vira portão da Fase 0.5 |
-| **Plataforma** | Web mobile-first, aplicativo nativo depois | Obriga **API-first**: a lógica não pode morar no framework web, senão o app nativo vira reescrita |
-| **Stack** | TypeScript full-stack | Tipos compartilhados entre domínio, API, web e futuro app nativo — a maior vantagem prática para time pequeno |
-| **Back-end em Rust/Go?** | Não agora | Carga é I/O-bound, não CPU-bound. Detalhes e o gatilho para reconsiderar em `arquitetura.md` |
+| Pergunta | Resposta |
+|---|---|
+| Uso pessoal ou produto? | **Pessoal primeiro, SaaS comercial como destino.** Multi-tenant no schema desde o commit 1 |
+| Plataforma | **Web mobile-first, empacotada com Capacitor** |
+| Agregador | Definir na Fase 2 — mas validar preço, cobertura e suporte a Capacitor desde já |
+| Modelo de IA | API hospedada, executada **somente no servidor** |
+| Stack | **TypeScript full-stack** — o motor roda no servidor e no cliente com o mesmo código |
+| Rust/Go no backend | **Não.** Carga é I/O-bound e o motor precisa rodar no cliente. Reconsiderar só para o worker de sync, com medição |
 
-Decisões ainda abertas: **qual agregador** (decide na Fase 0.5, com preço em mãos) e **modelo de IA hospedado vs. local** (decide na Fase 1).
+O detalhamento técnico dessas escolhas, e o que cada uma impõe, está em **[arquitetura.md](arquitetura.md)**.
 
-Detalhamento técnico completo em **[arquitetura.md](arquitetura.md)**.
+Duas consequências que já valem aqui:
+
+- **"SaaS depois" não permite arquitetura de usuário único agora.** Isolamento de dados financeiros não se retrofita.
+- **O plano gratuito não pode incluir conexão bancária** — é o custo que escala e que você não controla. O gratuito é manual/OFX + linha do tempo; o pago é banco + IA. O paywall tem a mesma forma do roadmap.
 
 ---
 
