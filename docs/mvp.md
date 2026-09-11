@@ -52,7 +52,11 @@ Não bloqueiam o spike, mas bloqueiam a produção. Resolva em paralelo, desde j
 
 **CNPJ.** Agregadores em geral contratam com pessoa jurídica, não física. Vale perguntar a cada fornecedor se MEI atende — é o caminho mais rápido para ter CNPJ. Descobrir isso na véspera do lançamento é atraso puro.
 
-**Preço por conexão.** Em SaaS o agregador é custo variável por usuário: três contas conectadas custam 3×, antes de qualquer receita. Isso define o preço mínimo da assinatura e, portanto, se o negócio fecha. Obtenha número real de Pluggy, Belvo e Klavi.
+**Preço — e aqui há uma descoberta que muda o plano.** Levantamento de set/2026 indica **piso mensal fixo**, não custo por conexão: Tecnospeed ~R$ 540/mês (+ ~R$ 1.500 de entrada), Pluggy ~R$ 2.500/mês, Belvo ~R$ 6.000/mês. *(Números não confirmados na fonte — verifique.)*
+
+Piso fixo significa que **você paga igual com 1 ou com 400 usuários**. Não existe soft launch barato. A R$ 2.500/mês, o break-even só do agregador é ~100 assinantes a R$ 24,90.
+
+**Isso não invalida a conexão como core do produto — invalida ela como core do primeiro release.** Ver seção 12.
 
 ---
 
@@ -193,7 +197,27 @@ PAGO     conexão automática + IA               onde está o seu custo
 
 Antes, a ideia era construir o gratuito primeiro e o pago depois. Agora você **constrói o pago primeiro**, e o gratuito é o que sobra quando se remove a conexão — porque o cadastro manual já existe como rede de segurança.
 
-É melhor assim: você lança com a coisa pela qual as pessoas pagam, e o plano gratuito vira aquisição sem custo adicional de desenvolvimento.
+Era melhor assim — **até o preço do agregador entrar na conta.** Ver seção 12.
+
+---
+
+## 12. A correção que o preço do agregador impõe
+
+O piso fixo de mensalidade (seção 3) cria um problema que nenhuma escolha de arquitetura resolve:
+
+> Para ligar a conexão você precisa de ~100 assinantes. Para ter 100 assinantes você precisa de um produto. Para ter o produto você precisa da conexão.
+
+**Como sair do laço, sem abrir mão da conexão como core:**
+
+**1. Spike primeiro, e ele é grátis.** Pluggy oferece acesso completo à API por 14 dias, sem cartão, incluindo conexão real de Open Finance em produção. Isso responde as cinco perguntas da seção 2 a **custo zero** e sem contrato. É a jogada de maior retorno do projeto inteiro: em duas semanas você sabe se o produto é possível.
+
+**2. Verifique a Tecnospeed antes de tudo.** A ~R$ 540/mês, o break-even cai para ~22 assinantes. Se atender, o laço praticamente desaparece.
+
+**3. Lance o gratuito primeiro — agora por economia, não por risco.** O plano gratuito (cadastro manual + linha do tempo) tem custo marginal perto de zero. Ele constrói audiência e lista de espera enquanto você não pode pagar o piso. A conexão liga quando a lista converte.
+
+Repare: é a mesma sequência que uma versão anterior deste documento propunha, mas o motivo é outro e mais forte. Não é "manual é um MVP mais barato de testar" — a conexão continua sendo o core do produto, como você apontou. É **"o piso do agregador não permite ligar a conexão antes de ter assinantes"**. A restrição é financeira, não de produto.
+
+**O que o MVP continua sendo:** conectar e enxergar. O que muda é o momento de virar a chave da conexão para o público — e que, até lá, o gratuito segura a audiência.
 
 ---
 

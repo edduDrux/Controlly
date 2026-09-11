@@ -209,11 +209,33 @@ Aqui está o insight mais valioso desta seção, e ele resolve um problema de pr
 
 | Custo | Comportamento |
 |---|---|
-| Agregador Open Finance | Por conexão/mês. **Dominante.** Um usuário com 3 contas custa 3× |
+| Agregador Open Finance | **Piso mensal fixo, não custo por conexão.** Ver abaixo — muda a forma do negócio |
 | API do modelo | Por uso. Controlável com cache e cascata de categorização |
 | Infra | Marginal no começo |
 
-> ⚠️ Preços de agregador mudam e variam por volume. Confirme na fonte antes de modelar qualquer coisa a sério.
+### O piso do agregador, e por que ele domina tudo
+
+Levantamento de setembro de 2026 (fontes no fim da seção):
+
+| Fornecedor | Custo de entrada | Mensalidade |
+|---|---|---|
+| Tecnospeed | ~R$ 1.500 | **~R$ 540** |
+| Pluggy | — | ~R$ 2.500 |
+| Belvo | — | ~R$ 6.000 |
+
+> ⚠️ Números de relato público e de busca, não confirmados na fonte — as páginas dos fornecedores não foram acessíveis daqui. **Confirme antes de decidir qualquer coisa.**
+
+**A consequência é estrutural e inverte uma premissa anterior deste documento.** O custo do agregador **não escala com o número de usuários** — é piso fixo. Você paga igual com 1 ou com 400 usuários.
+
+Isso muda tudo:
+
+- **Não existe soft launch com dez usuários.** O piso corre desde o primeiro dia
+- **Break-even só do agregador**, a R$ 2.500/mês: ~100 assinantes a R$ 24,90, ou ~126 a R$ 19,90 — antes de infraestrutura, IA e impostos
+- **Acima do piso a margem é excelente**, porque o custo marginal do usuário seguinte é quase zero. O problema é atravessar o vale, não escalar
+
+**Consequência prática:** a conexão bancária não pode ser o que você liga no lançamento. Ela é o que você liga **quando já tem assinantes suficientes para cobrir o piso** — o que exige construir audiência antes, com o plano gratuito.
+
+Tecnospeed a ~R$ 540/mês é 4,6× mais barato que Pluggy e derruba o break-even para ~22 assinantes a R$ 24,90. **Se atender ao caso de uso, muda o projeto inteiro** — é a primeira verificação a fazer.
 
 **A conclusão que decide o produto:**
 
